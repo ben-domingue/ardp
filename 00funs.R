@@ -55,17 +55,20 @@ imv.mirt.local<-function (mod1, mod2 = NULL, nfold = 5, fscores.options = (list(
     ni <- length(unique(x$item))
     test <- FALSE
     if (whole.matrix) {
-        counter <- 1
-        while (!test & counter < 100) {
-            x$group <- sample(1:nfold, nrow(x), replace = TRUE)
-            lll <- split(x, x$group)
-            nps <- sapply(lll, function(x) length(unique(x$id)))
-            test1 <- all(nps == np)
-            nis <- sapply(lll, function(x) length(unique(x$item)))
-            test2 <- all(nis == ni)
-            test <- test2 & test1
+        counter<-1
+        while (!test & counter<100) {
+            x$group<-sample(1:nfold,nrow(x),replace=TRUE)
+            nps<-nis<-numeric()
+            for (ii in 1:nfold) {
+                tmp<-x[x$group!=i,]
+                nps[ii]<-length(unique(tmp$id))
+                nis[ii]<-length(unique(tmp$item))
+            }
+            test1<-all(nps==np)
+            test2<-all(nis==ni)
+            test<-test2 & test1
         }
-    } else x$group <- sample(1:nfold, nrow(x), replace = TRUE)
+    } else x$group<-sample(1:nfold,nrow(x),replace=TRUE)
     if (!test & counter >= 100) 
         stop("sample sizes don't support whole.matrix=TRUE")
     getcall <- function(mod) {
