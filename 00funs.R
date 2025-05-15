@@ -1,3 +1,51 @@
+groupdiff<-function(df,group,
+                    g0=0,
+                    group.key=1) {
+    library(imv)
+    library(mirt)
+    library(irw)
+    ##fitting model in group 1
+    ni<-ncol(df)
+    s<-paste("F=1-",ni,"\nPRIOR = (1-",ni,", a1, lnorm, 0.0, 0.3)",
+             sep="") 
+    model<-mirt.model(s)
+    df1<-df[group==group.key,]
+    mod.ins<-mirt(df1,model,itemtype="2PL",method="EM",technical=list(NCYCLES=10000),guess=g0) 
+    ##get test data in shape
+    df2<-df[group!=group.key,]
+    L<-list()
+    for (i in 1:ncol(df2)) L[[i]]<-data.frame(id=rownames(df2),item=names(df2)[i],resp=df2[,i])
+    df2l<-data.frame(do.call("rbind",L))
+    df2l$train<-rbinom(nrow(df2l),1,.75)
+    df2.tr<-makeresponse(df2l[df2l$train==1,],remove.nonvarying.items=FALSE)
+    id<-df2.tr$id    
+    ##predictions based on group 1
+    df2.tr$id<-NULL
+    th<-fscores(mod.ins,response.pattern=df2.tr)
+    L<-list()
+    for (i in 1:ncol(df2.tr)) {
+        mm<-extract.item(mod.ins,names(df2.tr)[i])
+        p<-probtrace(mm,th[,1])[,2]
+        L[[i]]<-data.frame(id=id,item=names(df2.tr)[i],pr=p)
+    }
+    pr1<-data.frame(do.call("rbind",L))
+    pred<-merge(df2l[df2l$train==0,],pr1) ##only thing you need
+    ##fit model in group 2
+    m0<-mirt(df2.tr,model,itemtype="2PL",method="EM",technical=list(NCYCLES=10000),guess=g0) 
+    ##predictions in group 2
+    th<-fscores(m0,response.pattern=df2.tr)
+    L<-list()
+    for (i in 1:ncol(df2.tr)) {
+        mm<-extract.item(m0,names(df2.tr)[i])
+        p<-probtrace(mm,th[,1])[,2]
+        L[[i]]<-data.frame(id=id,item=names(df2.tr)[i],p2=p)
+    }
+    pr1<-data.frame(do.call("rbind",L))
+    ##
+    pred<-merge(pred,pr1) ##only thing you need
+    pred<-pred[!is.na(pred$resp),]
+    imv::imv.binary(pred$resp,pred$pr,pred$p2)
+}
 
 makeresponse<-function(x,
                        remove.nonvarying.items=TRUE,
@@ -31,42 +79,44 @@ makeresponse<-function(x,
 
 
 
-imv.mirt.local<-function (mod1, mod2 = NULL, nfold = 5, fscores.options = (list(method = "EAP")), 
-   whole.matrix = TRUE, ...) 
+imv.mirt.local<-function (mod1, mod2, nfold = 5, fscores.options = (list(method = "EAP")), 
+                          model2=NULL,
+                          model3=NULL,
+                          G=NULL, #the guessing parameter which will be used
+                          whole.matrix = TRUE, #should ensure every person/item is in every iteration of the training data
+                          ...) 
 {
     library(mirt)
     kk <- mod1@Data$K
     if (!all(kk == 2)) 
         stop("only works for dichotomous responses")
     x <- mod1@Data$data
-    if (is.null(mod2)) {
-        return(imv0mirt(...))
-    }
     x2 <- mod2@Data$data
     if (!identical(x, x2)) 
         stop("Models run on different data")
     id <- 1:nrow(x)
     L <- list()
     for (i in 1:ncol(x)) L[[i]] <- data.frame(id = id, item = colnames(x)[i], 
-        resp = x[, i])
+                                              resp = x[, i])
     x <- data.frame(do.call("rbind", L))
     x <- x[!is.na(x$resp), ]
     np <- length(unique(x$id))
     ni <- length(unique(x$item))
-    test <- FALSE
     if (whole.matrix) {
         counter<-1
+        test<-FALSE
         while (!test & counter<100) {
             x$group<-sample(1:nfold,nrow(x),replace=TRUE)
             nps<-nis<-numeric()
             for (ii in 1:nfold) {
-                tmp<-x[x$group!=i,]
-                nps[ii]<-length(unique(tmp$id))
-                nis[ii]<-length(unique(tmp$item))
+                train <- makeresponse(x[x$group != ii, ], remove.nonvarying.items=TRUE)
+                nps[ii]<-nrow(train)
+                nis[ii]<-ncol(train)-1 #no items
             }
             test1<-all(nps==np)
             test2<-all(nis==ni)
             test<-test2 & test1
+            counter<-counter+1
         }
     } else x$group<-sample(1:nfold,nrow(x),replace=TRUE)
     if (!test & counter >= 100) 
@@ -80,7 +130,7 @@ imv.mirt.local<-function (mod1, mod2 = NULL, nfold = 5, fscores.options = (list(
     }
     c1 <- getcall(mod1)
     c2 <- getcall(mod2)
-rmse1<-rmse2<-om <- numeric()
+    rmse1<-rmse2<-om <- numeric()
     for (i in 1:nfold) {
         train <- makeresponse(x[x$group != i, ], ...)
         id <- train$id
