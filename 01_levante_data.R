@@ -2,6 +2,7 @@ library(tidyverse)
 ##dat<-readRDS("task_data_prepped.rds") ##https://github.com/levante-framework/levante-pilots/blob/main/02_scoring_outputs/irt_data/task_data_prepped.rds
 dat<-readRDS("independent_task_data_prepped.rds") ##https://github.com/levante-framework/levante-pilots/blob/3070382bd41326445deb936713f12aae5deb7729/02_scoring_outputs/irt_data/independent_task_data_prepped.rds#L2
 
+
 for (iii in 1:nrow(dat)) {
     df<-dat[iii,]$data_prepped[[1]]
     ##collapsing multiple items
@@ -41,6 +42,7 @@ for (iii in 1:nrow(dat)) {
     print(nm)
     print(dim(df))
 }
+
 
 for (nm in c("egma-math","mental-rotation","trog","vocab")) {
     i<-grep(nm,dat$task_id)
