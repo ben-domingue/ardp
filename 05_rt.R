@@ -93,7 +93,6 @@ add.item<-function(df,nfold=5) {
 library(parallel)
 om0<-mclapply(LL,add.item,mc.cores=10,nfold=0)
 
-
 ##
 add.rt<-function(df,nfold=5) {
     if (nfold==0) {
@@ -141,3 +140,26 @@ om1<-mclapply(LL,add.rt,mc.cores=10,nfold=0)
 tab<-cbind(unlist(om0),unlist(om1))
 xtable::xtable(tab,digits=4)
 
+
+
+##add shape for previous item
+for (i in 1:length(LL)) {
+    df<-LL[[i]]
+    if (unique(df$task_id=="hearts-and-flowers")) {
+        ll<-split(df,df$user_id)
+        f<-function(x) {
+            z<-x[,c("trial_number","shape")]
+            z$trial_number<-z$trial_number+1
+            names(z)[2]<-"shape_last"
+            x<-merge(x,z)
+            x
+        }
+        ll<-lapply(ll,f)
+        df<-data.frame(do.call("rbind",ll))
+        ##
+        df$item<-paste(df$shape,df$shape_last,df$item_group,sep="__")
+        df<-df[df$item!="flower__heart__flowers",] ##first item in flowers sequence
+        LL[[i]]<-df
+    }
+}
+om2<-mclapply(LL,add.item,mc.cores=10,nfold=0)

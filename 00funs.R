@@ -44,7 +44,8 @@ groupdiff<-function(df,group,
     ##
     pred<-merge(pred,pr1) ##only thing you need
     pred<-pred[!is.na(pred$resp),]
-    imv::imv.binary(pred$resp,pred$pr,pred$p2)
+    ##imv::imv.binary(pred$resp,pred$pr,pred$p2)
+    c(sqrt(mean((pred$resp-pred$pr)^2)),sqrt(mean((pred$resp-pred$p2)^2)))
 }
 
 makeresponse<-function(x,
